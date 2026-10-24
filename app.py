@@ -199,17 +199,77 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    import detector
 
-    # TODO: delete this and build the route.
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+
+    text = payload.get("text")
+    creator_id = payload.get("creator_id")
+
+    # Bad input is refused before any signal runs (criteria.md #1).
+    problem = None
+    if text is None:
+        problem = "text is missing"
+    elif not isinstance(text, str):
+        problem = "text must be a string"
+    elif not text.strip():
+        problem = "text is empty"
+    elif len(text) > config.MAX_TEXT_CHARS:
+        problem = f"text is longer than {config.MAX_TEXT_CHARS} characters"
+    elif not isinstance(creator_id, str) or not creator_id.strip():
+        problem = "creator_id is missing or empty"
+
+    if problem:
+        return _reject(creator_id, problem)
+
+    try:
+        model_score = detector.model_signal(text)
+    except ValueError as exc:
+        # The detector refuses text with fewer than 3 tokens.
+        return _reject(creator_id, str(exc))
+    except detector.DetectorUnavailable as exc:
+        return jsonify({"error": "detector_unavailable", "message": str(exc)}), 503
+
+    content_id = str(uuid.uuid4())
+
+    # Placeholders until Milestones 4 and 5.
+    style_score = None
+    confidence = None
+    guess = None
+    label = "placeholder label"
+
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=model_score,
+        style_score=style_score,
+        combined_score=confidence,
+        label=label,
+        status="decided",
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": guess,
+        "confidence": confidence,
+        "label": label,
+        "model_score": model_score,
+        "style_score": style_score,
+        "status": "decided",
+    })
+
+
+def _reject(creator_id, message: str):
+    """Refuse a bad /submit, leaving a trace in the log."""
+    audit.log_rejection(
+        creator_id=creator_id if isinstance(creator_id, str) else "unknown",
+        reason="invalid_input",
+        message=message,
+    )
+    return jsonify({"error": "invalid_input", "message": message}), 400
 
 
 @app.post("/appeal")

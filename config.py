@@ -47,7 +47,14 @@ DETECTOR_MODEL = os.getenv("AI201_DETECTOR_MODEL", "gpt2")
 DETECTOR_MAX_TOKENS = 400
 
 
-# ─── Scoring (Milestone 4) ───────────────────────────────────────────────────
+# ─── Input limits ────────────────────────────────────────────────────────────
+# Longest `text` /submit accepts. criteria.md #1: anything over 9999 characters
+# is refused with a 400 before any signal runs.
+
+MAX_TEXT_CHARS = 9999
+
+
+# ─── Scoring (Milestone 4)───────────────────────────────────────────────────
 # How much each signal counts toward the combined score.
 #
 # ⚠️ These are placeholders. Milestone 4 asks you to write your combining rule

@@ -121,14 +121,27 @@
      two off the response, so leaving them out costs you next unit's
      diagnostics. -->
 
+*Milestone 3 version — signal one only; confidence, guess, label and style_score are placeholders until Milestones 4–5.*
+
+`para.txt` contains this human-written NOAA article excerpt:
+
+> His name might not sound familiar to you, but George Pollard was a whaling captain from Nantucket, Massachusetts, in the 19th century. His previous whaling vessel, the Essex, had been rammed by a whale and sunk. Pollard’s story — which included drifting on the open ocean and, eventually, cannibalism — found its way to Herman Melville, who used the incident as fodder for his classic novel, Moby Dick. Years later and in control of the vessel Two Brothers, Pollard gained notoriety again when his ship hit a shallow reef off French Frigate Shoals in Hawaii on the night of Feb. 11, 1823. Fearing a repeat of his harrowing experience with the Essex, Pollard hesitated about what to do but his crew persuaded him to abandon ship. They all spent a long night clinging to small boats for survival and were rescued the next morning by a passing ship. As for the Two Brothers, it was lost beneath the ocean for 188 years. Until 2008. That year, during a NOAA-led expedition to study marine archaeology in the Northwestern Hawaiian Islands, Two Brothers was found again, 600 miles northwest of Honolulu, in Papahānaumokuākea Marine National Monument.
+
 ```bash
-$ curl -X POST http://127.0.0.1:5000/submit \
-  -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+$ curl -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" \
+  -d "$(python -c 'import json; print(json.dumps({"text": open("para.txt").read(), "creator_id": "u1"}))')"
 ```
 
 ```json
-
+{
+  "confidence": null,
+  "content_id": "2278716e-2a22-4e26-80cb-a4c23b5d34ea",
+  "guess": null,
+  "label": "placeholder label",
+  "model_score": 0.7134,
+  "status": "decided",
+  "style_score": null
+}
 ```
 
 **An appeal**
@@ -149,8 +162,25 @@ $ curl -X POST http://127.0.0.1:5000/appeal \
 $ curl "http://127.0.0.1:5000/log?limit=3"
 ```
 
-```json
+*Milestone 3 version — after the submission above, before any appeal.*
 
+```json
+{
+  "count": 1,
+  "entries": [
+    {
+      "combined_score": null,
+      "content_id": "2278716e-2a22-4e26-80cb-a4c23b5d34ea",
+      "creator_id": "u1",
+      "guess": null,
+      "label": "placeholder label",
+      "model_score": 0.7134,
+      "status": "decided",
+      "style_score": null,
+      "timestamp": "2026-10-24T21:12:29+00:00"
+    }
+  ]
+}
 ```
 
 ---
