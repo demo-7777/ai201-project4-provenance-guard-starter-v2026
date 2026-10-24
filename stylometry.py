@@ -64,8 +64,14 @@ def sentence_length_spread(text: str) -> float:
     `stdev` raises on fewer than two values. Decide what that should return
     before the attack set decides for you.
     """
-    # TODO: replace this
-    return 0.0
+    # Coefficient of variation of words per sentence: stdev / mean.
+    # Higher = more varied = more human. 0.0 when there's no spread to measure.
+    lengths = [len(words(s)) for s in sentences(text)]
+    lengths = [n for n in lengths if n > 0]
+    if len(lengths) < 2:
+        return 0.0
+    mean = statistics.mean(lengths)
+    return statistics.stdev(lengths) / mean
 
 
 def type_token_ratio(text: str) -> float:
@@ -80,8 +86,16 @@ def type_token_ratio(text: str) -> float:
     directly comparable on it, and if your test inputs vary a lot in length,
     that alone can look like a signal.
     """
-    # TODO: replace this
-    return 0.0
+    # Moving-average TTR over 50-word windows, so long and short texts are
+    # comparable. Under 50 words, plain TTR. Higher = more varied = more human.
+    w = words(text)
+    if not w:
+        return 0.0
+    window = 50
+    if len(w) <= window:
+        return len(set(w)) / len(w)
+    ratios = [len(set(w[i:i + window])) / window for i in range(len(w) - window + 1)]
+    return statistics.mean(ratios)
 
 
 def punctuation_density(text: str) -> float:
@@ -94,8 +108,13 @@ def punctuation_density(text: str) -> float:
         more interesting than full stops, because they vary more between
         writers.
     """
-    # TODO: replace this
-    return 0.0
+    # Marks other than commas and full stops — ; : — – ( ) ! ? " … — per 100
+    # words. These vary more between writers. Higher = more human.
+    w = words(text)
+    if not w:
+        return 0.0
+    marks = re.findall(r"[;:!?()\"“”…—–]", text)
+    return 100 * len(marks) / len(w)
 
 
 # ── Combining them ───────────────────────────────────────────────────────────
@@ -122,8 +141,26 @@ def style_signal(text: str) -> float:
     you trust it. Plain and ordinary, not formal: formal prose reads as *human*
     to signal one, and it is plain writing that gets accused.
     """
-    # TODO: replace this
-    return 0.5
+    # All three measures point "higher = more human", so each is flipped onto a
+    # 0–1 AI-ness scale between two anchors (value at which it reads fully AI,
+    # value at which it reads fully human), then combined as a weighted average.
+    # The anchors are first guesses — calibrate them on the Milestone 4 inputs.
+    #
+    # Word variety gets less weight (0.2): the hypothesis is that AI draws on a
+    # smaller vocabulary, but in testing the AI paragraph had the MOST varied
+    # words, so it's the least trusted of the three.
+    def ai_ness(value: float, fully_ai: float, fully_human: float) -> float:
+        score = (fully_human - value) / (fully_human - fully_ai)
+        return min(max(score, 0.0), 1.0)
+
+    if len(sentences(text)) < 2:
+        spread_ai = 0.5  # one sentence: no evidence either way
+    else:
+        spread_ai = ai_ness(sentence_length_spread(text), fully_ai=0.2, fully_human=0.6)
+    ttr_ai = ai_ness(type_token_ratio(text), fully_ai=0.70, fully_human=0.85)
+    punct_ai = ai_ness(punctuation_density(text), fully_ai=0.0, fully_human=4.0)
+
+    return round(0.4 * spread_ai + 0.2 * ttr_ai + 0.4 * punct_ai, 4)
 
 
 if __name__ == "__main__":

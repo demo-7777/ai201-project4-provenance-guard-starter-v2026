@@ -57,7 +57,7 @@
 
 **Why that might differ between human and AI writing:** A language model writes by repeatedly picking a likely next word, so its output tends to be easy for another model to predict (low perplexity). Human writing makes more surprising choices — odd words, abrupt turns, specific details — which raises perplexity.
 
-**What it can't see:** Predictability is not authorship. Plain writers, second-language writers, younger writers, or anyone using common words in short sentences can score as AI — a false positive on real work. The reverse also happens: dense prose full of rare words, or AI text with unusual words swapped in, can score as human.
+**What it can't see:** Predictability is not authorship. Plain writers, second language writers, younger writers, or anyone using common words in short sentences can score as AI — a false positive on real work. The reverse also happens: dense prose full of rare words, or AI text with unusual words swapped in, can score as human.
 
 ### Signal two — the style signal
 
@@ -65,23 +65,49 @@
 
 **Why that might differ between human and AI writing:** AI writing tends to have consistent, predictable sentence length and a preference for a certain set of words over others. On the other hand, human writing and sentence structure tends to be more volatile and with word choice changing depending on the context or writer's feelings at the moment.
 
-**What it can't see:** It only counts, but doesn't comprehend the text. A writer may try to bypass the signal by inserting or removing certain punctuation or word choices that would signal AI writing.
+**What it can't see:** It only counts, but doesn't comprehend the text. A writer may try to bypass the signal by inserting or removing certain punctuation or word choices that would signal AI writing. Word variety is also measured within one text, while AI's preference for certain words mostly shows up across many texts — in testing, the AI paragraph actually had the *most* varied vocabulary (0.95), which is why that measure carries the least weight.
+
+**How the three measures combine** (`stylometry.py::style_signal`): each measure is flipped onto a 0–1 AI scale between two anchors, then weighted:
+
+| Measure | Reads fully AI at | Reads fully human at | Weight |
+|---|---|---|---|
+| Sentence length spread (stdev ÷ mean words per sentence) | 0.20 | 0.60 | 0.4 |
+| Word variety (unique ÷ total words, 50-word moving windows) | 0.70 | 0.85 | 0.2 |
+| Punctuation (`; : — – ( ) ! ? " …` per 100 words) | 0.0 | 4.0 | 0.4 |
+
+A one-sentence text gets 0.5 on spread, since there is nothing to measure.
+
+**A change to signal one:** I moved the perplexity midpoint in `detector.py::model_signal` from 45 to 25 (the perplexity that scores 0.5). At 45, no human test text scored below about 0.6 on signal one, so the high confidence human label was unreachable. 25 was the smallest change that made all three labels reachable while still catching lightly edited AI.
 
 ### The combining rule
 
-<!-- Write the rule in words, then give the numbers. What happens when the two
-     signals disagree? -->
-
-**The rule:**
+**The rule:** A weighted average of the two signals. If the two signals are more than 0.4 apart, the result is held inside the unsure band, so neither "AI" nor "human" can be reached on one signal's say-so — two methods disagreeing is itself uncertainty.
 
 **The numbers:**
+- `combined = 0.5 × model_score + 0.5 × style_score`
+- If `|model_score − style_score| > 0.4`, `combined` is clamped to 0.36–0.64 (inside the unsure band)
+- Label thresholds: ≤ 0.35 human, ≥ 0.65 AI, unsure in between
+- All in `config.py`: `WEIGHT_MODEL_SIGNAL`, `WEIGHT_STYLE_SIGNAL`, `DISAGREEMENT_GAP`, `HUMAN_THRESHOLD`, `AI_THRESHOLD`
+
+Equal weights because I had no evidence yet that one signal deserves more trust than the other; the disagreement rule handles the cases where they split instead.
 
 **Where it lives:** `scoring.py::combine_signals`
 
-<!-- ⚠️ The grader checks your code against that line. If your rule lives
-     somewhere else, say where. -->
-
 **A case where my two signals split, and what my rule does with it:**
+
+A 2015 NASA news release about the New Horizons Pluto flyby (human-written). Signal one scored it 0.53 — formal news prose is predictable to gpt2, and an article this widely published may even be in its training data. Signal two scored it 0.00 — uneven sentence lengths and lots of quotes and dashes. The gap is 0.53, over the 0.4 limit, so the rule holds the result in the unsure band: combined 0.36, label **unsure**. Without the rule, the average would be 0.27 — "human" — on the strength of signal two alone.
+
+Calibration results (midpoint 25):
+
+| Text | model | style | combined | label |
+|---|---|---|---|---|
+| Clearly AI (generated, unedited) | 0.74 | 0.80 | 0.77 | ai |
+| Lightly-edited AI (typos, a few words changed) | 0.56 | 0.80 | 0.68 | ai |
+| Human — NASA 2015 news release | 0.53 | 0.00 | 0.36 | unsure |
+| Plain human — FTC press release | 0.38 | 0.18 | 0.28 | human |
+| Reflective, AI-sounding "between" text | 0.70 | 0.51 | 0.60 | unsure |
+
+Typos alone raised the edited AI's perplexity from 12.9 to 21.3 — signal one's blind spot in action. Signal two didn't move at all, because the edits didn't change sentence lengths or punctuation.
 
 
 

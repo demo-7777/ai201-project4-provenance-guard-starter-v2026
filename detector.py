@@ -127,7 +127,9 @@ def model_signal(text: str) -> float:
     """
     ppl = perplexity(text)
 
-    midpoint = 45.0    # perplexity that scores 0.5
+    # Moved from 45 to 25 after Milestone 4 calibration: at 45 no human test
+    # text scored below ~0.6, so the "human" label was unreachable.
+    midpoint = 25.0    # perplexity that scores 0.5
     steepness = 1.6    # how sharply the score moves either side of it
 
     # Logistic on log-perplexity. Low perplexity -> high AI score.
