@@ -39,6 +39,17 @@
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
 
+Provenance Guard is a small backend service a writing site could plug into. A piece of writing goes in; a guess, a confidence score, a plain-English label, and a way to appeal come back.
+
+1. **The writer sends JSON `{text, creator_id}` to `POST /submit`** (`app.py::submit`). The route refuses missing, empty, whitespace-only, non-string, or over-9999-character text with a 400 before any signal runs, and logs the refusal.
+2. **Signal one** (`detector.py::model_signal`) runs gpt2 locally and scores how predictable the text is (perplexity), 0–1, higher = more likely AI.
+3. **Signal two** (`stylometry.py::style_signal`) scores the text's shape — sentence length spread, word variety, punctuation — 0–1, higher = more likely AI.
+4. **The combining rule** (`scoring.py::combine_signals`) averages the two 50/50. If they disagree by more than 0.4, the result is held in the unsure band.
+5. **The label mapping** (`scoring.py::score_to_label`) turns the combined score into a guess (`human` / `unsure` / `ai`) and the sentence the writer sees, using the thresholds in `config.py`.
+6. **The decision is logged** (`audit.py::log_decision` → `logs/audit.jsonl`): timestamp, content_id, creator_id, guess, both signal scores, the combined score, the label, and status `decided`.
+7. **The route responds** with `content_id`, `guess`, `confidence`, `label`, `model_score`, `style_score`, and `status`. The writer sees the label.
+
+If the writer thinks the label is wrong, they send their `content_id` and reasoning to **`POST /appeal`** (`app.py::appeal`). The route checks the content_id exists (404 if not), appends the appeal to the log next to the original decision, sets the status to `under_review`, and confirms. A person then reviews it; nothing is re-scored automatically.
 
 
 ---
@@ -246,15 +257,15 @@ The original decision, the rejected appeal on the unknown id, and the real appea
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked the AI to write `test_signals.sh` so I could paste in test paragraphs (clearly AI, lightly-edited AI, two human news releases, and an in-between text) and see both signal scores, the combined score, and the label side by side.
+- *What came back:* The table showed no input could reach the "human" label. Signal one never scored a human text below about 0.6, so the combined score couldn't get under 0.35 without the two signals disagreeing by more than 0.4, which my disagreement rule sends to "unsure". The AI suggested moving the detector's perplexity midpoint and showed the labels at 45, 25, 20, 18 and 15.
+- *What I changed:* I moved the midpoint from 45 to 25, the smallest change that made all three labels reachable while lightly-edited AI was still caught. I chose it over 20, which let the edited AI slip to "unsure".
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked the AI to build the three style measures in `stylometry.py` (sentence length spread, word variety, punctuation) and run them on my test paragraphs.
+- *What came back:* Word variety ran the opposite way from the lab's hypothesis — the AI paragraph had the *most* varied vocabulary (0.95 vs 0.86–0.88 for the human texts), so with equal weights that measure read every text as human and added nothing. The AI suggested to either drop it, flip its direction, or keep it and report it as a measure that doesn't discriminate.
+- *What I changed:* I kept my hypothesis that AI draws on a smaller set of words, so the direction stayed the same, but I cut its weight from 1/3 to 0.2 and raised sentence length spread and punctuation to 0.4 each. The AI pointed out that a single text can't show AI's preference for certain words, since that appears across many texts, so I added that to signal two's blind spot.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
