@@ -1,0 +1,113 @@
+1. Writer sends JSON {text, creator_id} to POST /submit.
+   The route rejects empty text, missing text, or a work 
+   beyond the size limit, then it creates a content_id.
+
+
+2. That text is passed to signal one where the data is
+   read and given a score from 0-1 evaluating how predictable 
+   the text is to a language model (gpt2). A score of 1 means has low
+   perplexity.
+
+3. That text is then passed to signal two where the data is
+   read and given a score from 0-1 evalauting  the text's shape: 
+   sentence length spread, word variety, punctuation. A score of 1 
+   means the shape of the text is consistent with AI patterns.
+
+4. The scores from each signal are passed to scoring.py and used 
+   by combine_signals to generate a score that is a combination of 
+   the two from 0-1. For now, the combining rule would be
+   (score1+score2)/2 (until there is an observed valid reason to justify 
+   one score having more weight than the other).
+
+5. Given the combined score, that score would be read in scoring.py 
+   by score_to_label to decide the guess and label to assign to the writer's 
+   work. The guess is determined based on the thresholds set in config.py
+
+6. The label and the work it corresponds to is recorded 
+   by log_decision into logs/audit.jsonl.
+   Other additional elements recorded include timestamp, content_id, 
+   creator_id, guess, both signal scores, the combined score, the label, 
+   and status decided.
+
+7. The route sends back JSON with content_id, guess, confidence, label, 
+   model_score and style_score. The writer sees the label, and the content_id
+   is what lets them appeal.
+
+
+False-positive trace
+--------------------
+Who: a writer whose first language isn't English submits a short personal
+essay they wrote themselves. They stick to words they're sure of and keep
+sentences short and similar in length.
+
+1. POST /submit accepts the text (not empty, under the size limit) and
+   creates a content_id.
+
+2. Signal one: common words in short, ordinary sentences are easy for gpt2
+   to predict -> low perplexity -> model_score around 0.80.
+
+3. Signal two: sentence lengths barely vary and the vocabulary repeats ->
+   style_score around 0.70.
+
+4. combine_signals: (0.80 + 0.70) / 2 = 0.75.
+
+5. score_to_label: 0.75 is above the AI threshold (0.65 for now) ->
+   guess "ai", and the writer sees the high-confidence AI label on work
+   they wrote themselves.
+
+6. log_decision records the decision with status "decided".
+
+7. The writer receives the label and their content_id.
+
+8. The writer sends POST /appeal with their content_id and their reasoning
+   (e.g. "I wrote this myself; I write simply because English is my second
+   language").
+
+9. The route checks the content_id exists, log_appeal records the appeal
+   next to the original decision, and the status becomes "under_review".
+   The writer gets a confirmation.
+
+10. A person reviews the appeal and decides whether the label stays or
+    changes. The system does not re-check automatically.
+
+What this tells me: both signals fail the same way on this writer, so
+averaging doesn't protect them. The threshold and the label wording are
+what decide how bad this is for them, which makes the AI threshold the
+number to set carefully.
+
+
+Endpoint fields
+---------------
+POST /submit
+  in:
+    text        string, required. Non-empty, at most 10,000 characters
+                (limit is a placeholder - decide before building).
+    creator_id  string, required. Non-empty. Who wrote it.
+  out (200):
+    content_id   string. Unique id for this submission; needed to appeal.
+    guess        "ai" | "human" | "unsure"
+    confidence   number 0-1. Combined score; higher = more likely AI.
+    label        string. The full sentence the writer/reader sees.
+    model_score  number 0-1. Signal one's score.
+    style_score  number 0-1. Signal two's score.
+    status       "decided"
+  error (400):
+    error        "invalid_input"
+    message      string. Which field is wrong and why
+                 (missing, empty, too long, not a string).
+
+POST /appeal
+  in:
+    content_id  string, required. Must match an earlier submission.
+    reasoning   string, required. Non-empty. The writer's explanation.
+  out (200):
+    content_id  string. Same id that was appealed.
+    status      "under_review"
+    message     string. Confirmation that the appeal was recorded and a
+                person will review it.
+  error (400):
+    error       "invalid_input"
+    message     string. content_id or reasoning missing/empty.
+  error (404):
+    error       "not_found"
+    message     string. No submission with that content_id.

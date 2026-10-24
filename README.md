@@ -53,19 +53,19 @@
 
 ### Signal one — the model signal
 
-**What it measures:**
+**What it measures:** perplexity — how predictable the submitted text is, word by word, to the gpt2 language model (first ~400 tokens). Low perplexity scores closer to 1 (more likely AI).
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** A language model writes by repeatedly picking a likely next word, so its output tends to be easy for another model to predict (low perplexity). Human writing makes more surprising choices — odd words, abrupt turns, specific details — which raises perplexity.
 
-**What it can't see:**
+**What it can't see:** Predictability is not authorship. Plain writers, second-language writers, younger writers, or anyone using common words in short sentences can score as AI — a false positive on real work. The reverse also happens: dense prose full of rare words, or AI text with unusual words swapped in, can score as human.
 
 ### Signal two — the style signal
 
-**What it measures:**
+**What it measures:** surface statistics of the submitted text itself — how much sentence lengths vary, the share of words that are unique, and how much punctuation is used — combined into one 0–1 score where closer to 1 means more likely AI.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** AI writing tends to have consistent, predictable sentence length and a preference for a certain set of words over others. On the other hand, human writing and sentence structure tends to be more volatile and with word choice changing depending on the context or writer's feelings at the moment.
 
-**What it can't see:**
+**What it can't see:** It only counts, but doesn't comprehend the text. A writer may try to bypass the signal by inserting or removing certain punctuation or word choices that would signal AI writing.
 
 ### The combining rule
 
