@@ -122,15 +122,15 @@ Typos alone raised the edited AI's perplexity from 12.9 to 21.3 — signal one's
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00 – 0.35 | Human: Your submission appears to be human written. |
+| unsure | above 0.35, below 0.65 | Mixed: Your submission is difficult to tell if it was AI generated or human written. |
+| high-confidence AI | 0.65 – 1.00 | AI: Your submission appears to be AI generated. You can send an appeal with [POST /appeal]. |
 
 **Why I worded the "unsure" one this way:**
 <!-- It's the hardest of the three. It has to admit uncertainty without
      sounding like an accusation, because the person reading it may well have
      written every word themselves. -->
-
+Other AI detection tools online have used the term "Mixed" to refer to a submission they are unsure of. In the context of this system, a submission may lead to unsure because it has a mixture of elements that suggest both AI or human generated text.
 
 
 ---
@@ -147,8 +147,6 @@ Typos alone raised the edited AI's perplexity from 12.9 to 21.3 — signal one's
      two off the response, so leaving them out costs you next unit's
      diagnostics. -->
 
-*Milestone 3 version — signal one only; confidence, guess, label and style_score are placeholders until Milestones 4–5.*
-
 `para.txt` contains this human-written NOAA article excerpt:
 
 > His name might not sound familiar to you, but George Pollard was a whaling captain from Nantucket, Massachusetts, in the 19th century. His previous whaling vessel, the Essex, had been rammed by a whale and sunk. Pollard’s story — which included drifting on the open ocean and, eventually, cannibalism — found its way to Herman Melville, who used the incident as fodder for his classic novel, Moby Dick. Years later and in control of the vessel Two Brothers, Pollard gained notoriety again when his ship hit a shallow reef off French Frigate Shoals in Hawaii on the night of Feb. 11, 1823. Fearing a repeat of his harrowing experience with the Essex, Pollard hesitated about what to do but his crew persuaded him to abandon ship. They all spent a long night clinging to small boats for survival and were rescued the next morning by a passing ship. As for the Two Brothers, it was lost beneath the ocean for 188 years. Until 2008. That year, during a NOAA-led expedition to study marine archaeology in the Northwestern Hawaiian Islands, Two Brothers was found again, 600 miles northwest of Honolulu, in Papahānaumokuākea Marine National Monument.
@@ -160,26 +158,43 @@ $ curl -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" 
 
 ```json
 {
-  "confidence": null,
-  "content_id": "2278716e-2a22-4e26-80cb-a4c23b5d34ea",
-  "guess": null,
-  "label": "placeholder label",
-  "model_score": 0.7134,
+  "confidence": 0.4037,
+  "content_id": "483ee8b7-4f23-4844-8be4-e97d60b755c4",
+  "guess": "unsure",
+  "label": "Mixed: Your submission is difficult to tell if it was AI generated or human written.",
+  "model_score": 0.4928,
   "status": "decided",
-  "style_score": null
+  "style_score": 0.3146
 }
 ```
 
 **An appeal**
 
+First with a content_id that doesn't exist, then with the real one from the submission above:
+
 ```bash
-$ curl -X POST http://127.0.0.1:5000/appeal \
-  -H "Content-Type: application/json" \
-  -d '{"content_id": "...", "reasoning": "..."}'
+$ curl -X POST http://127.0.0.1:5000/appeal -H "Content-Type: application/json" \
+  -d '{"content_id": "PASTE-ID", "reasoning": "I wrote this myself."}'
 ```
 
 ```json
+{
+  "error": "not_found",
+  "message": "No submission with content_id PASTE-ID."
+}
+```
 
+```bash
+$ curl -X POST http://127.0.0.1:5000/appeal -H "Content-Type: application/json" \
+  -d '{"content_id": "483ee8b7-4f23-4844-8be4-e97d60b755c4", "reasoning": "I wrote this myself."}'
+```
+
+```json
+{
+  "content_id": "483ee8b7-4f23-4844-8be4-e97d60b755c4",
+  "message": "Your appeal has been recorded. A person will review it.",
+  "status": "under_review"
+}
 ```
 
 **What the log shows afterwards**
@@ -188,22 +203,38 @@ $ curl -X POST http://127.0.0.1:5000/appeal \
 $ curl "http://127.0.0.1:5000/log?limit=3"
 ```
 
-*Milestone 3 version — after the submission above, before any appeal.*
+The original decision, the rejected appeal on the unknown id, and the real appeal — appended after the decision, which stays unchanged:
 
 ```json
 {
-  "count": 1,
+  "count": 3,
   "entries": [
     {
-      "combined_score": null,
-      "content_id": "2278716e-2a22-4e26-80cb-a4c23b5d34ea",
+      "combined_score": 0.4037,
+      "content_id": "483ee8b7-4f23-4844-8be4-e97d60b755c4",
       "creator_id": "u1",
-      "guess": null,
-      "label": "placeholder label",
-      "model_score": 0.7134,
+      "guess": "unsure",
+      "label": "Mixed: Your submission is difficult to tell if it was AI generated or human written.",
+      "model_score": 0.4928,
       "status": "decided",
-      "style_score": null,
-      "timestamp": "2026-10-24T21:12:29+00:00"
+      "style_score": 0.3146,
+      "timestamp": "2026-10-24T22:22:02+00:00"
+    },
+    {
+      "attempted_content_id": "PASTE-ID",
+      "creator_id": "unknown",
+      "event": "rejected",
+      "reason": "appeal_unknown_content_id",
+      "status": "rejected",
+      "timestamp": "2026-10-24T22:22:15+00:00"
+    },
+    {
+      "content_id": "483ee8b7-4f23-4844-8be4-e97d60b755c4",
+      "creator_id": "u1",
+      "event": "appeal",
+      "reasoning": "I wrote this myself.",
+      "status": "under_review",
+      "timestamp": "2026-10-24T22:23:23+00:00"
     }
   ]
 }

@@ -293,14 +293,49 @@ def appeal():
     to the person on the other end. It's the only thing standing between a
     wrong accusation and nothing at all.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
 
-    # TODO: delete this and build the route.
+    content_id = payload.get("content_id")
+    reasoning = payload.get("reasoning")
+
+    problem = None
+    if not isinstance(content_id, str) or not content_id.strip():
+        problem = "content_id is missing or empty"
+    elif not isinstance(reasoning, str) or not reasoning.strip():
+        problem = "reasoning is missing or empty"
+    if problem:
+        audit.log_rejection(creator_id="unknown", reason="invalid_appeal", message=problem)
+        return jsonify({"error": "invalid_input", "message": problem}), 400
+
+    # The appeal must point at a real decision. Checked against decisions only,
+    # so a rejected or earlier appeal entry can't stand in for one.
+    decisions = [e for e in audit.entries_for(content_id) if e.get("status") == "decided"]
+    if not decisions:
+        # Stored as attempted_content_id, not content_id, so this rejection
+        # never makes the unknown id look like it exists.
+        audit.log_rejection(
+            creator_id="unknown",
+            reason="appeal_unknown_content_id",
+            attempted_content_id=content_id,
+        )
+        return jsonify({
+            "error": "not_found",
+            "message": f"No submission with content_id {content_id}.",
+        }), 404
+
+    audit.log_appeal(
+        content_id=content_id,
+        creator_id=decisions[0]["creator_id"],
+        reasoning=reasoning,
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+        "content_id": content_id,
+        "status": "under_review",
+        "message": "Your appeal has been recorded. A person will review it.",
+    })
 
 
 # ── Already works ─────────────────────────────────────────────────────────────

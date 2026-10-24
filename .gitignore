@@ -20,6 +20,8 @@ Thumbs.db
 # Local scratch output
 dump.txt
 para.txt
+ai.txt
+plain.txt
 
 # NOTE: logs/ and results/ are deliberately NOT ignored. Your audit log and
 # your attack runs are evidence, and they're part of what gets graded.
