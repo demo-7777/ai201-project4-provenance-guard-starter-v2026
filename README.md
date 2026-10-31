@@ -273,24 +273,38 @@ The original decision, the rejected appeal on the unknown id, and the real appea
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 9 per minute, 99 per day (`config.py`: `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_PER_DAY`)
 
 **Why those numbers and not others:**
-<!-- Think about two people: a real writer submitting their own work a few
-     times an hour, and a script sending a thousand variations to map your
-     thresholds. Your numbers have to be liveable for the first and hostile to
-     the second. -->
+A real writer submits their own work a few times an hour at most. 9 a minute still leaves room for a burst — fixing a typo and resubmitting, or posting a few short pieces back to back — without ever hitting the limit. 99 a day is far more than any one person writes in a day.
 
-**What a caller counts as:** <!-- per address, or per creator_id? They fail
-differently — one script can look like a thousand callers, and one household
-can look like one. -->
+A script trying to map my thresholds needs hundreds or thousands of variations to find where 0.35 and 0.65 sit. At 9 a minute, 1,000 probes take nearly two hours instead of seconds, and the 99 a day cap stops it after 99 no matter how patient it is. Every rejected request is logged, so the probing shows up in the log instead of disappearing.
+
+**What a caller counts as:** per `creator_id`, falling back to the caller's address when a request has no usable `creator_id` (`app.py::rate_limit_key`). This stops one writer account flooding the service, but a script that makes up a new `creator_id` for every request looks like many different callers and isn't limited at all. Per-address limiting would catch that script, but would also lump together everyone sharing one network (a household or a school).
 
 **The run of status codes when I pushed past it:**
 
-<!-- python run_attacks.py --flood 15 -->
+```
+$ python run_attacks.py --flood 15
+15 submissions as 'flood_tester' against http://127.0.0.1:5000
 
+200 200 200 200 200 200 200 200 200 429 429 429 429 429 429
+
+6 of 15 were rate limited.
+Wrote results/flood_2026-10-31_1801.md
 ```
 
+The rejections land in the audit log (`GET /log`):
+
+```json
+{
+  "creator_id": "flood_tester",
+  "event": "rejected",
+  "limit": "9 per 1 minute",
+  "reason": "rate_limited",
+  "status": "rejected",
+  "timestamp": "2026-10-31T22:01:40+00:00"
+}
 ```
 
 ---
