@@ -337,17 +337,102 @@ whose work got caught by it:
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. Bad input returns 400, never 500 or a label | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Appeals confirmed and logged; unknown id gets 404 | 5 of 5 + 404 | 5/5 + 404 | 5/5 + 404 | 5/5 + 404 | MET |
+| 3. Pre-2020 human pieces labeled AI | ≤ 1 of 10 | 1/10 | 1/10 | 1/10 | MET |
+| 4. All three labels reachable | 3 of 3 | 3/3 | 3/3 | 3/3 | MET |
+| 5. Mean AI score − mean human score | ≥ 0.50 | 0.331 | 0.331 | 0.331 | MISSED |
 
-**Real output from one trial**, pasted as text, naming the file and function
-that produced it:
+All three trials were identical for every criterion — neither signal is random, so this is the expected result.
+
+**How each verdict was decided:**
+1. Every bad body returned status 400 with no guess or label, in all three trials. (`run_eval.py` records the status code but not the body; the `error` field comes from `app.py::_reject`, which every 400 from `/submit` goes through.)
+2. In every trial, all 5 appeals returned `under_review` and had exactly one matching appeal entry in `GET /log` with the same reasoning; the never-submitted id returned 404 and added no appeal entry.
+3. Exactly 1 of 10 came back `ai` in every trial — at the target, not under it. Only 2 of 10 reached `human`; the other 7 were `unsure`.
+4. `human`, `unsure`, and `ai` each appeared at least once in every trial.
+5. AI mean 0.759, human mean 0.428 — a gap of 0.331 in every trial, short of 0.50.
+
+**Real output from one trial** (trial 1). Criteria 1, 3, 4, 5 from `run_eval.py::main` → `results/run_2026-10-31_1919_before.md`; criterion 2 from `run_appeals.py::main` → `results/appeals_2026-10-31_1922_before.md`.
+
+*Criterion 1 — bad input (all five bodies):*
 
 ```json
+[
+  {"status": 400, "guess": null, "confidence": null, "model_score": null, "style_score": null, "label": null, "sent": "{\"creator_id\": \"eval_bad_missing\"}"},
+  {"status": 400, "guess": null, "confidence": null, "model_score": null, "style_score": null, "label": null, "sent": "(empty text)"},
+  {"status": 400, "guess": null, "confidence": null, "model_score": null, "style_score": null, "label": null, "sent": "   "},
+  {"status": 400, "guess": null, "confidence": null, "model_score": null, "style_score": null, "label": null, "sent": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  {"status": 400, "guess": null, "confidence": null, "model_score": null, "style_score": null, "label": null, "sent": "{\"text\": 5, \"creator_id\": \"eval_bad_number\"}"}
+]
+```
 
+*Criterion 2 — one real appeal and the unknown id:*
+
+```json
+{
+  "appeals": [
+    {
+      "content_id": "3b203df6-39f3-4065-b5e8-ef5e0dc35c05",
+      "status_code": 200,
+      "response": {
+        "content_id": "3b203df6-39f3-4065-b5e8-ef5e0dc35c05",
+        "message": "Your appeal has been recorded. A person will review it.",
+        "status": "under_review"
+      },
+      "log_entry": {
+        "content_id": "3b203df6-39f3-4065-b5e8-ef5e0dc35c05",
+        "creator_id": "eval_appeal_t1_1",
+        "event": "appeal",
+        "reasoning": "I wrote this myself (eval trial 1, appeal 1).",
+        "status": "under_review",
+        "timestamp": "2026-10-31T23:22:16+00:00"
+      },
+      "passed": true
+    }
+  ],
+  "unknown_id": {
+    "content_id": "never-submitted-a2c2d155-adab-48ec-b358-8be6f5f9d7c2",
+    "status_code": 404,
+    "response": {
+      "error": "not_found",
+      "message": "No submission with content_id never-submitted-a2c2d155-adab-48ec-b358-8be6f5f9d7c2."
+    },
+    "appeal_entries_added": 0,
+    "passed": true
+  }
+}
+```
+
+*Criterion 3 — the one human piece labeled AI:*
+
+```json
+{
+  "status": 200,
+  "guess": "ai",
+  "confidence": 0.6784,
+  "model_score": 0.6113,
+  "style_score": 0.7454,
+  "label": "AI: Your submission appears to be AI generated. You can send an appeal with [POST /appeal].",
+  "sent": "In 2016, my word was Grace. That was the perfect word for my first yea"
+}
+```
+
+*Criterion 4 — one result for each label:*
+
+```json
+[
+  {"status": 200, "guess": "unsure", "confidence": 0.36, "model_score": 0.5292, "style_score": 0.0, "label": "Mixed: Your submission is difficult to tell if it was AI generated or human written.", "sent": "The call everyone was waiting for is in. NASA’s New Horizons spacecraf"},
+  {"status": 200, "guess": "ai", "confidence": 0.7717, "model_score": 0.7434, "style_score": 0.8, "label": "AI: Your submission appears to be AI generated. You can send an appeal with [POST /appeal].", "sent": "Artificial intelligence has become an increasingly important aspect of"},
+  {"status": 200, "guess": "human", "confidence": 0.2781, "model_score": 0.3777, "style_score": 0.1785, "label": "Human: Your submission appears to be human written.", "sent": "This week, an administrator working for the Federal Trade Commission b"}
+]
+```
+
+*Criterion 5 — the combined scores (`confidence`) behind the gap:*
+
+```
+AI texts:     0.7717  0.7117  0.7719  0.7403  0.8014   mean 0.759
+Human texts:  0.3600  0.5859  0.4037  0.3600  0.4328   mean 0.428
+Gap: 0.331 (target ≥ 0.50)
 ```
 
 **Diagnoses**
