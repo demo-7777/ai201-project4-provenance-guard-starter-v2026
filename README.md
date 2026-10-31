@@ -451,6 +451,25 @@ Gap: 0.331 (target ≥ 0.50)
 
      Look for a pattern. Five failures on one signal is one problem, not five. -->
 
+**Criterion 5 (score spread) — MISSED, gap 0.331 vs ≥ 0.50.**
+
+Signal scores behind it (trial 1):
+
+| Group | mean model_score | mean style_score |
+|---|---|---|
+| 5 clearly AI | 0.706 | 0.813 |
+| 5 clearly human (press releases/articles) | 0.554 | 0.249 |
+| **Separation** | **0.152** | **0.564** |
+
+- **Stage: signal one. Mechanism: formal institutional prose is predictable to gpt2.** Signal one separates the two groups by only 0.15. The human texts are government press releases — formulaic sentences, standard phrasing ("according to a new study", "said … director of"), the kind of text that fills gpt2's training data — so their perplexity is low and they score like AI. The CDC sleep release scored 0.77 on signal one, *higher* than three of the five AI texts. Signal two separates the groups by 0.56 on its own.
+- **Stage: the combining rule. Mechanism: equal weights halve the good signal, and the disagreement rule lifts the lowest human scores.** At 0.5/0.5, the combined separation is the average of the two: 0.5 × 0.152 + 0.5 × 0.564 = 0.358 — already under 0.50 before anything else happens. Then two human texts (NASA, gap 0.53; honey bees, gap 0.54) had signals more than 0.4 apart, so the disagreement rule raised them from 0.265 and 0.320 to the 0.36 floor. That added 0.027 to the human mean and brought the gap to 0.331.
+
+So the miss is one problem with two parts: signal one barely tells formal human writing from AI, and the combining rule gives it half the say. With these weights, no threshold change can reach 0.50 — it needs either more weight on signal two or a signal one that separates better.
+
+**A close call worth noting — criterion 3 (met at exactly 1 of 10).** The one false positive was a plain personal blog post ("In 2016, my word was Grace…"): model 0.61, style 0.75. **Stage: signal two. Mechanism: plain personal writing has the even rhythm signal two treats as AI.** It is a run of similar length sentences built the same way ("I learned I have… I learned sometimes… I learned the importance…") with almost no punctuation beyond commas and full stops, so sentence length spread and punctuation both read as AI. Three of the other four plain pieces also scored 0.58–0.65 on signal two. Signal two catches formal human text well but leans toward accusing plain writers — the opposite blind spot from signal one.
+
+*Broken attacks from the attack set will be diagnosed here after Milestone 2.*
+
 
 
 ---
