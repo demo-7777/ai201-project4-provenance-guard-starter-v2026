@@ -314,18 +314,111 @@ The rejections land in the audit log (`GET /log`):
 <!-- Every attack with its outcome and a held-or-broke mark.
      `run_attacks.py --label before` produces the table. -->
 
+Produced by `run_attacks.py::main` → `results/attack_run_2026-11-04_2104_before.md` (56 attacks).
 
+**How I marked them:**
+- **AI text breaks only if it is labeled human.** (Evasion EV01–EV10, and the prompt injections built on AI text: PI01, PI02, PI03, PI05.) `unsure` holds — the system didn't vouch for it.
+- **Human text breaks only if it is labeled AI.** (False positives FP01–FP08, the injections built on human text — PI04, PI06 — and MF07, which is real Arabic writing.) `unsure` holds — the same rule as criterion 3.
+- **Junk input** (MF03–MF06, not writing at all) breaks on a 5xx or a confident `ai`/`human` label; a 400 or `unsure` holds.
+- **Malformed requests** hold on a 4xx. **Flood rows** hold if the limiter lets the first 9 through and returns 429 after.
+
+**Totals: 39 held, 17 broke.**
+
+| Family | Held | Broke |
+|---|---|---|
+| Evasion | 6 | 4 |
+| False positive | 2 | **6** |
+| Prompt injection | 2 | 4 |
+| Malformed (text + requests) | 17 | 3 |
+| Flood same creator | 12 | 0 |
+
+| ID | Family | Targeting | Status | Guess | Score | Verdict |
+|---|---|---|---|---|---|---|
+| EV01 | evasion | signal two: typos raise word variety | 200 | unsure | 0.435 | HELD |
+| EV02 | evasion | signal two: broken-up sentences raise length spread | 200 | human | 0.217 | BROKE |
+| EV03 | evasion | signal two: a pasted quotation changes the shape | 200 | human | 0.309 | BROKE |
+| EV04 | evasion | signal one: unusual words raise perplexity | 200 | unsure | 0.590 | HELD |
+| EV05 | evasion | both signals: heavy human editing pass | 200 | human | 0.217 | BROKE |
+| EV06 | evasion | signal two: one very long sentence and one very short | 200 | unsure | 0.373 | HELD |
+| EV07 | evasion | signal two: padding with punctuation | 200 | human | 0.281 | BROKE |
+| EV08 | evasion | signal one: text below the token window | 200 | unsure | 0.415 | HELD |
+| EV09 | evasion | both: AI text with a human opening paragraph bolted on | 200 | unsure | 0.507 | HELD |
+| EV10 | evasion | signal two: repeated stanza structure | 200 | ai | 0.877 | HELD |
+| FP01 | false_positive | plain, clear human writing with no flourishes | 200 | unsure | 0.494 | HELD |
+| FP02 | false_positive | human writing in a formal register | 200 | ai | 0.696 | BROKE |
+| FP03 | false_positive | a non-native English speaker writing carefully | 200 | ai | 0.665 | BROKE |
+| FP04 | false_positive | a student essay written to a rubric | 200 | ai | 0.666 | BROKE |
+| FP05 | false_positive | technical documentation written by a person | 200 | ai | 0.767 | BROKE |
+| FP06 | false_positive | a person imitating a formal template | 200 | ai | 0.675 | BROKE |
+| FP07 | false_positive | human writing that repeats a phrase deliberately | 200 | ai | 0.672 | BROKE |
+| FP08 | false_positive | very short genuine human submission | 200 | unsure | 0.362 | HELD |
+| PI01 | prompt_injection | instruction to ignore the check | 200 | human | 0.326 | BROKE |
+| PI02 | prompt_injection | instruction disguised as a system message | 200 | human | 0.135 | BROKE |
+| PI03 | prompt_injection | instruction wrapped in the writer's voice | 200 | human | 0.310 | BROKE |
+| PI04 | prompt_injection | attempt to make the label text hostile | 200 | human | 0.246 | HELD |
+| PI05 | prompt_injection | attempt to inject into the audit log | 200 | human | 0.269 | BROKE |
+| PI06 | prompt_injection | instruction plus real human text | 200 | unsure | 0.468 | HELD |
+| MF01 | malformed | text is only whitespace | 400 | — | — | HELD |
+| MF02 | malformed | text is a single character | 400 | — | — | HELD |
+| MF03 | malformed | text is control characters | 200 | unsure | 0.360 | HELD |
+| MF04 | malformed | text is only punctuation | 200 | unsure | 0.502 | HELD |
+| MF05 | malformed | text is a very long single word | 200 | ai | 0.797 | BROKE |
+| MF06 | malformed | text is emoji only | 200 | ai | 0.896 | BROKE |
+| MF07 | malformed | text is right-to-left script | 200 | ai | 0.795 | BROKE |
+| MF08 | malformed | text is 60,000 characters | 400 | — | — | HELD |
+| RQ01 | malformed | no text field at all | 400 | — | — | HELD |
+| RQ02 | malformed | no creator_id | 400 | — | — | HELD |
+| RQ03 | malformed | text is a number | 400 | — | — | HELD |
+| RQ04 | malformed | text is a list | 400 | — | — | HELD |
+| RQ05 | malformed | text is null | 400 | — | — | HELD |
+| RQ06 | malformed | creator_id is an object | 400 | — | — | HELD |
+| RQ07 | malformed | body is a JSON array, not an object | 400 | — | — | HELD |
+| RQ08 | malformed | body is unparseable JSON | 400 | — | — | HELD |
+| RQ09 | malformed | body is empty | 400 | — | — | HELD |
+| RQ10 | malformed | body is form-encoded, not JSON | 400 | — | — | HELD |
+| RQ11 | malformed | body is JSON claiming to be plain text | 400 | — | — | HELD |
+| RQ12 | malformed | deeply nested JSON | 400 | — | — | HELD |
+| FL01_01 | flood_same_creator | 20 rapid submissions from one creator | 200 | unsure | 0.360 | HELD |
+| FL01_02 | flood_same_creator | 20 rapid submissions from one creator | 200 | unsure | 0.360 | HELD |
+| FL01_03 | flood_same_creator | 20 rapid submissions from one creator | 200 | unsure | 0.360 | HELD |
+| FL01_04 | flood_same_creator | 20 rapid submissions from one creator | 200 | unsure | 0.360 | HELD |
+| FL01_05 | flood_same_creator | 20 rapid submissions from one creator | 200 | unsure | 0.360 | HELD |
+| FL01_06 | flood_same_creator | 20 rapid submissions from one creator | 200 | unsure | 0.360 | HELD |
+| FL01_07 | flood_same_creator | 20 rapid submissions from one creator | 200 | unsure | 0.360 | HELD |
+| FL01_08 | flood_same_creator | 20 rapid submissions from one creator | 200 | unsure | 0.360 | HELD |
+| FL01_09 | flood_same_creator | 20 rapid submissions from one creator | 200 | unsure | 0.360 | HELD |
+| FL01_10 | flood_same_creator | 20 rapid submissions from one creator | 429 | — | — | HELD |
+| FL01_11 | flood_same_creator | 20 rapid submissions from one creator | 429 | — | — | HELD |
+| FL01_12 | flood_same_creator | 20 rapid submissions from one creator | 429 | — | — | HELD |
+
+**An earlier run that crashed.** My first attack run (`results/attack_run_2026-11-04_2056_before.md`) came back with 37 failures: EV01 timed out, and every scored request after EV02 returned 500 with `RuntimeError: Tensor.item() cannot be called on meta tensors`. The inputs weren't the cause — the server had just been restarted, so the model loaded on the first request, and that load outlasted the runner's 90-second timeout. The next request arrived while the model was still loading and started a second load in parallel; the two loads collided and left a broken model in memory, so every later submission crashed. I kept that run as evidence, restarted, warmed the model up with one submission, and ran the set again with no code changes — the table above is that second run. (Diagnosed below.)
 
 **Ten audit log entries from the run**
 
 <!-- Choose entries that show the interesting failures, not the ten easiest. -->
 
-```json
+From `logs/audit.jsonl` (read through `GET /log`):
 
+```json
+{"timestamp": "2026-11-05T02:03:41+00:00", "content_id": "532bd4c2-5625-4a3a-9ef3-ad425d6e42b4", "creator_id": "attacker_FP03", "guess": "ai", "model_score": 0.6173, "style_score": 0.7126, "combined_score": 0.6649, "label": "AI: Your submission appears to be AI generated. You can send an appeal with [POST /appeal].", "status": "decided"}
+{"timestamp": "2026-11-05T02:03:44+00:00", "content_id": "440d0ca6-f28c-439e-8ad4-0eb05537fecf", "creator_id": "attacker_FP05", "guess": "ai", "model_score": 0.6104, "style_score": 0.9231, "combined_score": 0.7668, "label": "AI: Your submission appears to be AI generated. You can send an appeal with [POST /appeal].", "status": "decided"}
+{"timestamp": "2026-11-05T02:04:08+00:00", "content_id": "8a4471d0-6794-4633-bbc6-dd4352950738", "creator_id": "attacker_MF07", "guess": "ai", "model_score": 0.7908, "style_score": 0.8, "combined_score": 0.7954, "label": "AI: Your submission appears to be AI generated. You can send an appeal with [POST /appeal].", "status": "decided"}
+{"timestamp": "2026-11-05T02:03:16+00:00", "content_id": "0c2c582e-67b4-4519-bf85-cd954eb697ed", "creator_id": "attacker_EV02", "guess": "human", "model_score": 0.3638, "style_score": 0.0703, "combined_score": 0.2171, "label": "Human: Your submission appears to be human written.", "status": "decided"}
+{"timestamp": "2026-11-05T02:03:22+00:00", "content_id": "6fef2866-380f-4087-aed0-a2607484a848", "creator_id": "attacker_EV05", "guess": "human", "model_score": 0.1559, "style_score": 0.278, "combined_score": 0.217, "label": "Human: Your submission appears to be human written.", "status": "decided"}
+{"timestamp": "2026-11-05T02:03:50+00:00", "content_id": "a019c053-548e-4eec-992b-31f9cac3729c", "creator_id": "attacker_PI02", "guess": "human", "model_score": 0.0912, "style_score": 0.1778, "combined_score": 0.1345, "label": "Human: Your submission appears to be human written.", "status": "decided"}
+{"timestamp": "2026-11-05T02:03:53+00:00", "content_id": "d860ea10-7c76-4e47-92d4-96e0f863c6d4", "creator_id": "attacker_PI05", "guess": "human", "model_score": 0.4099, "style_score": 0.1286, "combined_score": 0.2692, "label": "Human: Your submission appears to be human written.", "status": "decided"}
+{"timestamp": "2026-11-05T02:04:07+00:00", "content_id": "e3c4f22f-f6c2-49ec-b9e3-4a5c3d2c2174", "creator_id": "attacker_MF06", "guess": "ai", "model_score": 0.9921, "style_score": 0.8, "combined_score": 0.8961, "label": "AI: Your submission appears to be AI generated. You can send an appeal with [POST /appeal].", "status": "decided"}
+{"timestamp": "2026-11-05T02:03:34+00:00", "content_id": "bdfb9349-6dbd-4e88-9187-92d12b34948d", "creator_id": "attacker_EV10", "guess": "ai", "model_score": 0.9483, "style_score": 0.8061, "combined_score": 0.8772, "label": "AI: Your submission appears to be AI generated. You can send an appeal with [POST /appeal].", "status": "decided"}
+{"timestamp": "2026-11-05T02:04:08+00:00", "creator_id": "attacker_MF08", "event": "rejected", "status": "rejected", "reason": "invalid_input", "message": "text is longer than 9999 characters"}
+{"timestamp": "2026-11-05T02:04:13+00:00", "creator_id": "attacker_flood", "event": "rejected", "status": "rejected", "reason": "rate_limited", "limit": "9 per 1 minute"}
 ```
+
+What they show: three human writers labeled AI (FP03 non-native speaker, FP05 technical writer, MF07 Arabic writing); three AI texts labeled human (EV02 broken-up sentences, EV05 heavy editing, PI02 injected "SYSTEM" line); PI05's attempt to forge log fields — the entry is still one well-formed JSON object with the real scores, because the submitted text is never written to the log; emoji scored 0.99 on signal one; one AI text caught (EV10) for contrast; and two rejections — a 400 refusal and a 429 from the flood rows. The rejections carry fewer fields than decisions, as expected.
 
 **The single worst outcome** — the one I'd least want to explain to a writer
 whose work got caught by it:
+
+**FP03 — a non-native English speaker writing carefully, labeled AI (0.665).** This is the exact person I traced through the system in Milestone 1, and it happened the way I predicted: careful writing in a second language uses common words in short, regular sentences, so signal one finds it predictable (0.62) and signal two finds its shape even (0.71). Both signals agree, so the disagreement rule doesn't step in, and the score lands just over the 0.65 line. The writer is told "Your submission appears to be AI generated" — about work they wrote themselves, in a language they're still learning — and the only way out the label offers them is "[POST /appeal]", which means nothing to someone who isn't a developer.
 
 
 
