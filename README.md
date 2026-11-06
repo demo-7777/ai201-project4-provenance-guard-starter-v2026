@@ -269,6 +269,18 @@ The original decision, the rejected appeal on the unknown id, and the real appea
 - *What came back:* Word variety ran the opposite way from the lab's hypothesis — the AI paragraph had the *most* varied vocabulary (0.95 vs 0.86–0.88 for the human texts), so with equal weights that measure read every text as human and added nothing. The AI suggested to either drop it, flip its direction, or keep it and report it as a measure that doesn't discriminate.
 - *What I changed:* I kept my hypothesis that AI draws on a smaller set of words, so the direction stayed the same, but I cut its weight from 1/3 to 0.2 and raised sentence length spread and punctuation to 0.4 each. The AI pointed out that a single text can't show AI's preference for certain words, since that appears across many texts, so I added that to signal two's blind spot.
 
+**Moment 3 — marking the attack run held or broke**
+
+- *What I asked for:* After the clean attack run, I asked the AI how to mark each of the 56 results, since the runner leaves most verdicts blank.
+- *What came back:* It pointed out the marks depend on whether "unsure" counts as held. It proposed a rule that mirrors criterion 3, AI text only breaks if labeled human, human text only breaks if labeled AI. It also offered a stricter version where any evasion not labeled "ai" breaks, which would have turned 5 more evasions into BROKE. Its first pass marked PI05 as HELD because the attack's target, the audit log, held.
+- *What I changed:* I set the rule myself. AI text breaks only if it's labeled human, and human text breaks only if it's labeled AI. Applying my rule as written, PI05 became BROKE, its log forgery failed, but its AI text was still labeled human, so the final count was 17 broken. The rule for junk input (MF03–MF06, not writing at all) wasn't covered by mine, so I used the AI's, a crash or a confident label breaks.
+
+**Moment 4 — choosing one improvement**
+
+- *What I asked for:* With 17 broken attacks diagnosed, I asked which single change to make.
+- *What came back:* Instead of guessing, the AI simulated four options offline on the scores already recorded — signal two re-scored with each change, signal one taken from the run files — and checked the simulation reproduced my real 17 broken attacks before trusting it. Raising the AI threshold to 0.75 cut false positives from 6 to 1 with no new evasions and no change to criterion 5; the punctuation fixes cut false positives too but let one more evasion through and lowered the score spread. It recommended the threshold, with the punctuation fix as a possible second improvement.
+- *What I changed:* I chose the threshold. The simulation also changed my plan: my criterion 5 diagnosis had pointed toward giving signal two more weight, but the attack run showed signal two is the signal that's wrong on plain and formal human writing, so I dropped that idea. The real after run matched the simulation exactly.
+
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
@@ -762,12 +774,23 @@ Gap: 0.331 (target ≥ 0.50) — unchanged
 <!-- For each attack still getting through and each criterion still missed:
      what you'd do, and why you stopped. -->
 
+12 attacks still break and one criterion is still missed. Why I stopped, for all of them: the unit allows one improvement, and I spent it on the false positives because those are the expensive mistake. Everything below is what I'd do next, in the order I'd do it.
 
+| Still broken | Cause (from Diagnoses) | What I'd do | Why I stopped |
+|---|---|---|---|
+| **FP05** technical documentation, labeled AI (0.767) | Pattern 1: zero rare punctuation + even sentences push signal two to 0.92; signal one 0.61 | Fixing the punctuation measure isn't enough — my simulation showed FP05 still breaks with it, because its sentence spread (0.28) and word variety (0.63, technical terms repeat) read as AI too. It needs signal two to stop treating even, repetitive structure as AI on its own, or a stronger signal one to outvote it. | One improvement allowed, and no single change I simulated cleared it. |
+| **EV03, EV07, PI03, PI05** — added quotes, semicolons, parentheses or JSON | Pattern 2: the same punctuation measure; adding marks reads as "fully human" | Same fix, plus cap how much punctuation can pull the score toward human — one cheap edit shouldn't be able to clear a text on its own. | Same as above. My simulation also showed the punctuation fixes cost more AI detection (3/5 clear AI caught), so it needs its own measured run. |
+| **EV02, EV05, PI01, PI02** — chopped-up sentences, heavy editing, injected instructions | Pattern 3: both signals read unusual text as human, so the disagreement rule never triggers | A third signal that doesn't measure surface shape — e.g. scoring the text after removing the first and last lines, so a bolted-on instruction or opener can't carry the whole score. EV05 (a genuine heavy human edit) may be fair to call human. | Out of scope for one change; a new signal is a redesign, not a fix. |
+| **MF05, MF06, MF07** — one huge word, emoji, Arabic, labeled AI | Pattern 4: the route accepts text with no English words; signal two returns a fixed 0.80 on zero words | Validate in the route: refuse text with fewer than ~20 English words with a 400 that says the service only reads English. For MF07 that's a refusal instead of an accusation — still not good for a writer in Arabic, but honest. | One improvement allowed; this affects 3 attacks vs 5 for the threshold. |
+| **The cold-start crash** (first attack run, 37 × 500) | Model loads on first request with no lock; two parallel loads corrupt it | Load the model when the service starts, or put a lock around `detector._load`. | Didn't recur once I warmed the model up, so it wasn't in the measured runs — but a real service restarts, so this would be first on a production list. |
+| **Criterion 5** — score spread 0.331 vs ≥ 0.50, missed before and after | Signal one separates AI from formal human text by only 0.15, and equal weights cap the gap at about 0.36 | Not more weight on signal two — the attack run showed signal two is the one that's wrong on plain and formal human writing. A better signal one: a larger, newer model than gpt2, or calibrating its midpoint on a bigger set than my five texts. | A threshold can't move scores, and both fixes are larger than one change. |
 
 **The trade I'd make if this ran for real:**
 
 <!-- Two sentences. Fewer wrong accusations means more AI text getting through.
      Say which way you'd go and WHO PAYS FOR IT. -->
+
+I'd keep leaning toward fewer wrong accusations — the wider unsure band, and a fixed punctuation measure on top — because the people my false positives hit are careful, formal and second-language writers, who have the least room to argue with a label. The cost is paid by the site and its honest readers: more AI-written work goes out labeled "unsure" instead of "AI", and a determined cheater can get through with a few cheap edits.
 
 
 
