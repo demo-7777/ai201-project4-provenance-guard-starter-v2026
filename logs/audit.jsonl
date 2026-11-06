@@ -437,3 +437,4 @@
 {"timestamp": "2026-11-05T02:42:23+00:00", "content_id": "17923a14-6063-4ca8-853f-a14f0b661d0a", "creator_id": "eval_appeal_t3_5", "guess": "unsure", "model_score": 0.3827, "style_score": 0.483, "combined_score": 0.4328, "label": "Mixed: Your submission is difficult to tell if it was AI generated or human written.", "status": "decided"}
 {"timestamp": "2026-11-05T02:42:23+00:00", "content_id": "17923a14-6063-4ca8-853f-a14f0b661d0a", "creator_id": "eval_appeal_t3_5", "event": "appeal", "status": "under_review", "reasoning": "I wrote this myself (eval trial 3, appeal 5)."}
 {"timestamp": "2026-11-05T02:42:23+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "appeal_unknown_content_id", "attempted_content_id": "never-submitted-c1128034-9272-47a3-a4b9-d5f73ccb1c8e"}
+{"timestamp": "2026-11-06T19:59:11+00:00", "creator_id": "c1_check", "event": "rejected", "status": "rejected", "reason": "invalid_input", "message": "text is empty"}

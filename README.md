@@ -96,8 +96,8 @@ A one-sentence text gets 0.5 on spread, since there is nothing to measure.
 
 **The numbers:**
 - `combined = 0.5 × model_score + 0.5 × style_score`
-- If `|model_score − style_score| > 0.4`, `combined` is clamped to 0.36–0.64 (inside the unsure band)
-- Label thresholds: ≤ 0.35 human, ≥ 0.65 AI, unsure in between
+- If `|model_score − style_score| > 0.4`, `combined` is clamped to 0.36–0.74 (inside the unsure band)
+- Label thresholds: ≤ 0.35 human, ≥ 0.75 AI, unsure in between
 - All in `config.py`: `WEIGHT_MODEL_SIGNAL`, `WEIGHT_STYLE_SIGNAL`, `DISAGREEMENT_GAP`, `HUMAN_THRESHOLD`, `AI_THRESHOLD`
 
 Equal weights because I had no evidence yet that one signal deserves more trust than the other; the disagreement rule handles the cases where they split instead.
@@ -471,6 +471,20 @@ All three trials were identical for every criterion — neither signal is random
   {"status": 400, "guess": null, "confidence": null, "model_score": null, "style_score": null, "label": null, "sent": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
   {"status": 400, "guess": null, "confidence": null, "model_score": null, "style_score": null, "label": null, "sent": "{\"text\": 5, \"creator_id\": \"eval_bad_number\"}"}
 ]
+```
+
+`run_eval.py` records only the status code, so here is one of the same bodies sent by hand, showing the `error` field the criterion asks for (`app.py::_reject`):
+
+```bash
+$ curl -s -i -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d '{"text": "", "creator_id": "c1_check"}'
+```
+
+```
+HTTP/1.1 400 BAD REQUEST
+{
+  "error": "invalid_input",
+  "message": "text is empty"
+}
 ```
 
 *Criterion 2 — one real appeal and the unknown id:*
